@@ -1,0 +1,66 @@
+name: Microservices CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  ACR_NAME: myregistry # Replace with your ACR name
+  AKS_CLUSTER_NAME: my-cluster # Replace with your AKS cluster name
+  AKS_RESOURCE_GROUP: my-resource-group # Replace with your resource group
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [order_service, payment_service, product_service, user_service]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: ./.github/actions/setup-python
+        with:
+          python-version: '3.9'
+          install-dev-deps: 'true'
+
+      - name: Lint and Test
+        uses: ./.github/actions/lint-test
+        with:
+          source-dir: ./${{ matrix.service }}
+  
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service: [order_service, payment_service, product_service, user_service]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build and Push
+        uses: ./.github/actions/build-push
+        with:
+          service-name: ${{ matrix.service }}
+          registry-name: ${{ env.ACR_NAME }}
+          registry-username: ${{ secrets.ACR_USERNAME }}
+          registry-password: ${{ secrets.ACR_PASSWORD }}
+          dockerfile-path: 'Dockerfile'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to AKS
+        uses: ./.github/actions/deploy-aks
+        with:
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ env.AKS_CLUSTER_NAME }}
+          credentials: ${{ secrets.AZURE_CREDENTIALS }}
+          manifests-path: 'k8s'

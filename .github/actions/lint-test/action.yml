@@ -1,0 +1,37 @@
+name: 'Lint & Test'
+description: 'Runs linting and tests'
+inputs:
+  source-dir:
+    description: 'Directory containing source code'
+    required: false
+    default: '.'
+  run-lint:
+    description: 'Whether to run linting'
+    required: false
+    default: 'true'
+  run-test:
+    description: 'Whether to run tests'
+    required: false
+    default: 'true'
+runs:
+  using: "composite"
+  steps:
+    - name: Install Lint & Test tools
+      shell: bash
+      run: |
+        pip install flake8 pytest
+
+    - name: Lint with flake8
+      if: inputs.run-lint == 'true'
+      shell: bash
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 ${{ inputs.source-dir }} --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 ${{ inputs.source-dir }} --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Test with pytest
+      if: inputs.run-test == 'true'
+      shell: bash
+      run: |
+        pytest ${{ inputs.source-dir }}

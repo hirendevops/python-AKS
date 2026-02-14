@@ -1,0 +1,40 @@
+name: 'Deploy to AKS'
+description: 'Deploys manifests to AKS'
+inputs:
+  resource-group:
+    description: 'Azure Resource Group'
+    required: true
+  cluster-name:
+    description: 'AKS Cluster Name'
+    required: true
+  credentials:
+    description: 'Azure Credentials'
+    required: true
+  manifests-path:
+    description: 'Path to k8s manifests'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ inputs.credentials }}
+        
+    - name: Set AKS Context
+      uses: azure/aks-set-context@v3
+      with:
+        resource-group: ${{ inputs.resource-group }}
+        cluster-name: ${{ inputs.cluster-name }}
+        
+    - name: Deploy to AKS
+      shell: bash
+      run: |
+        # Ensure manifests-path exists and is not empty
+        if [ -d "${{ inputs.manifests-path }}" ]; then
+           kubectl apply -f ${{ inputs.manifests-path }}/
+           echo "Deployed manifests from ${{ inputs.manifests-path }}"
+        else
+           echo "Manifest path ${{ inputs.manifests-path }} not found or invalid."
+           exit 1
+        fi
